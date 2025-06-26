@@ -1,9 +1,16 @@
 import numpy as np
 import cv2
-import gym
+import gymnasium as gym
 from copy import deepcopy
 import torch
-from torch._six import inf
+import math
+
+# Import and register Atari environments
+try:
+    import ale_py
+    gym.register_envs(ale_py)
+except ImportError:
+    print("Warning: Could not import ale_py")
 
 
 def mean_of_list(func):
@@ -48,9 +55,11 @@ def explained_variance(ypred, y):
     return np.nan if vary == 0 else 1 - np.var(y - ypred) / vary
 
 
-def make_atari(env_id, max_episode_steps, sticky_action=True, max_and_skip=True):
-    env = gym.make(env_id)
-    env._max_episode_steps = max_episode_steps * 4
+def make_atari(env_id, max_episode_steps, sticky_action=True, max_and_skip=True, render_mode=None):
+    # 创建环境时添加render_mode参数
+    env = gym.make(env_id, render_mode=render_mode)
+    # Gymnasium使用max_episode_steps直接设置
+    env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps * 4)
     assert 'NoFrameskip' in env.spec.id
     if sticky_action:
         env = StickyActionEnv(env)
@@ -58,6 +67,8 @@ def make_atari(env_id, max_episode_steps, sticky_action=True, max_and_skip=True)
         env = RepeatActionEnv(env)
     env = MontezumaVisitedRoomEnv(env, 3)
     env = AddRandomStateToInfoEnv(env)
+    # 添加最终wrapper使环境返回与原始项目兼容的4值格式
+    env = ReturnFormatWrapper(env)
 
     return env
 
@@ -75,9 +86,9 @@ class StickyActionEnv(gym.Wrapper):
         self.last_action = action
         return self.env.step(action)
 
-    def reset(self):
+    def reset(self, **kwargs):
         self.last_action = 0
-        return self.env.reset()
+        return self.env.reset(**kwargs)
 
 
 class RepeatActionEnv(gym.Wrapper):
@@ -90,18 +101,26 @@ class RepeatActionEnv(gym.Wrapper):
 
     def step(self, action):
         reward, done = 0, False
+        final_info = {}
         for t in range(4):
-            state, r, done, info = self.env.step(action)
+            result = self.env.step(action)
+            if len(result) == 5:
+                state, r, terminated, truncated, info = result
+                done = terminated or truncated
+            else:
+                state, r, done, info = result
+            
             if t == 2:
                 self.successive_frame[0] = state
             elif t == 3:
                 self.successive_frame[1] = state
             reward += r
+            final_info = info  # Save the last info
             if done:
                 break
 
         state = self.successive_frame.max(axis=0)
-        return state, reward, done, info
+        return state, reward, done, final_info
 
 
 class MontezumaVisitedRoomEnv(gym.Wrapper):
@@ -111,7 +130,13 @@ class MontezumaVisitedRoomEnv(gym.Wrapper):
         self.visited_rooms = set()  # Only stores unique numbers.
 
     def step(self, action):
-        state, reward, done, info = self.env.step(action)
+        result = self.env.step(action)
+        if len(result) == 5:
+            state, reward, terminated, truncated, info = result
+            done = terminated or truncated
+        else:
+            state, reward, done, info = result
+        
         ram = self.unwrapped.ale.getRAM()
         assert len(ram) == 128
         self.visited_rooms.add(ram[self.room_address])
@@ -122,8 +147,8 @@ class MontezumaVisitedRoomEnv(gym.Wrapper):
             self.visited_rooms.clear()
         return state, reward, done, info
 
-    def reset(self):
-        return self.env.reset()
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
 
 
 class AddRandomStateToInfoEnv(gym.Wrapper):
@@ -132,16 +157,46 @@ class AddRandomStateToInfoEnv(gym.Wrapper):
         self.rng_at_episode_start = deepcopy(self.unwrapped.np_random)
 
     def step(self, action):
-        state, reward, done, info = self.env.step(action)
+        result = self.env.step(action)
+        if len(result) == 5:
+            state, reward, terminated, truncated, info = result
+            done = terminated or truncated
+        else:
+            state, reward, done, info = result
+        
         if done:
             if 'episode' not in info:
                 info['episode'] = {}
             info['episode']['rng_at_episode_start'] = self.rng_at_episode_start
         return state, reward, done, info
 
-    def reset(self):
+    def reset(self, **kwargs):
         self.rng_at_episode_start = deepcopy(self.unwrapped.np_random)
-        return self.env.reset()
+        return self.env.reset(**kwargs)
+
+
+class ReturnFormatWrapper(gym.Wrapper):
+    """将Gymnasium环境的5个返回值统一为原始项目使用的4个返回值格式"""
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+    
+    def step(self, action):
+        result = self.env.step(action)
+        if len(result) == 5:
+            state, reward, terminated, truncated, info = result
+            done = terminated or truncated
+        else:
+            state, reward, done, info = result
+        return state, reward, done, info
+    
+    def reset(self, **kwargs):
+        result = self.env.reset(**kwargs)
+        if isinstance(result, tuple) and len(result) == 2:
+            state, info = result
+        else:
+            state = result
+            info = {}
+        return state, info
 
 
 class RunningMeanStd:
@@ -202,7 +257,7 @@ def clip_grad_norm_(parameters, norm_type: float = 2.0):
     if len(parameters) == 0:
         return torch.tensor(0.)
     device = parameters[0].grad.device
-    if norm_type == inf:
+    if norm_type == math.inf:
         total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
     else:
         total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]),

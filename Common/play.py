@@ -2,11 +2,20 @@ from torch import device
 import os
 from Common.utils import *
 import time
+import gymnasium as gym
+
+# Import and register Atari environments
+try:
+    import ale_py
+    gym.register_envs(ale_py)
+except ImportError:
+    print("Warning: Could not import ale_py")
 
 
 class Play:
     def __init__(self, env, agent, checkpoint, max_episode=1):
-        self.env = make_atari(env, 4500, sticky_action=False)
+        # 指定render_mode='human'以便可视化
+        self.env = make_atari(env, 4500, sticky_action=False, render_mode='human')
         self.max_episode = max_episode
         self.agent = agent
         self.agent.set_from_checkpoint(checkpoint)
@@ -23,15 +32,17 @@ class Play:
         mean_ep_reward = []
         obs, int_rewards = [], []
         for ep in range(self.max_episode):
-            self.env.seed(ep)
-            s = self.env.reset()
+            # Use gymnasium's reset with seed
+            s, _ = self.env.reset(seed=ep)
             stacked_states = stack_states(stacked_states, s, True)
             episode_reward = 0
             clipped_ep_reward = 0
             done = False
             while not done:
                 action, *_ = self.agent.get_actions_and_values(stacked_states)
-                s_, r, done, info = self.env.step(action)
+                # 确保动作是标量整数而非数组
+                action_scalar = action.item() if isinstance(action, np.ndarray) else int(action)
+                s_, r, done, info = self.env.step(action_scalar)
                 episode_reward += r
                 clipped_ep_reward += np.sign(r)
 
@@ -42,7 +53,8 @@ class Play:
                 obs.append(s_)
 
                 self.VideoWriter.write(cv2.cvtColor(s_, cv2.COLOR_RGB2BGR))
-                self.env.render()
+                # 在render_mode='human'模式下，环境会自动渲染，无需额外调用
+                # self.env.render() 
                 time.sleep(0.01)
             print(f"episode reward:{episode_reward}| "
                   f"clipped episode reward:{clipped_ep_reward}| "

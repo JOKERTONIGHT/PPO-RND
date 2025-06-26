@@ -42,9 +42,9 @@ class Brain:
                ext_value.cpu().numpy().squeeze(), log_prob.cpu().numpy(), action_prob.cpu().numpy()
 
     def choose_mini_batch(self, states, actions, int_returns, ext_returns, advs, log_probs, next_states):
-        states = torch.ByteTensor(states).to(self.device)
+        states = torch.tensor(states, dtype=torch.uint8).to(self.device)
         next_states = torch.Tensor(next_states).to(self.device)
-        actions = torch.ByteTensor(actions).to(self.device)
+        actions = torch.tensor(actions, dtype=torch.uint8).to(self.device)
         advs = torch.Tensor(advs).to(self.device)
         int_returns = torch.Tensor(int_returns).to(self.device)
         ext_returns = torch.Tensor(ext_returns).to(self.device)

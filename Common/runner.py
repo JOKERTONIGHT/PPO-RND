@@ -19,7 +19,7 @@ class Worker:
         self.env.render()
 
     def reset(self):
-        state = self.env.reset()
+        state, _ = self.env.reset()
         self._stacked_states = stack_states(self._stacked_states, state, True)
 
     def step(self, conn):

@@ -5,8 +5,15 @@ from Common.logger import Logger
 from torch.multiprocessing import Process, Pipe
 import numpy as np
 from Brain.brain import Brain
-import gym
+import gymnasium as gym
 from tqdm import tqdm
+
+# Import and register Atari environments
+try:
+    import ale_py
+    gym.register_envs(ale_py)
+except ImportError:
+    print("Warning: Could not import ale_py")
 
 
 def run_workers(worker, conn):
@@ -82,7 +89,7 @@ if __name__ == '__main__':
         init_action_probs = np.zeros(rollout_base_shape + (config["n_actions"],))
         init_int_rewards = np.zeros(rollout_base_shape)
         init_ext_rewards = np.zeros(rollout_base_shape)
-        init_dones = np.zeros(rollout_base_shape, dtype=np.bool)
+        init_dones = np.zeros(rollout_base_shape, dtype=bool)
         init_int_values = np.zeros(rollout_base_shape)
         init_ext_values = np.zeros(rollout_base_shape)
         init_log_probs = np.zeros(rollout_base_shape)

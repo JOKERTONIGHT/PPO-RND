@@ -127,6 +127,15 @@ class Logger:
     def load_weights(self):
         model_dir = glob.glob("Models/*")
         model_dir.sort()
-        checkpoint = torch.load(model_dir[-1] + "/params.pth")
+        # 设置weights_only=False以兼容新版PyTorch
+        try:
+            checkpoint = torch.load(model_dir[-1] + "/params.pth", weights_only=False)
+        except Exception as e:
+            # 处理安全错误
+            print(f"Try to use safe_globals to load model: {e}")
+            # 添加必要的安全全局变量
+            with torch.serialization.safe_globals(['numpy.core.multiarray._reconstruct']):
+                checkpoint = torch.load(model_dir[-1] + "/params.pth", weights_only=False)
+                
         self.log_dir = model_dir[-1].split(os.sep)[-1]
         return checkpoint

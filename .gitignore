@@ -6,6 +6,16 @@ __pycache__/
 # C extensions
 *.so
 
+# results
+demo/
+Models/
+Plots/
+Results/
+
+*.pth
+*.avi
+*.gif
+
 # Distribution / packaging
 .Python
 build/
