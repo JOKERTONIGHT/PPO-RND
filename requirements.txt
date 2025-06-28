@@ -9,3 +9,6 @@ torch >= 2.0.0
 torchvision >= 0.15.0
 tensorboard >= 2.13.0
 tqdm >= 4.65.0
+autorom >= 0.4.2
+pillow >= 10.0.0  # For GIF creation
+imageio >= 2.31.0  # Alternative GIF creation library
