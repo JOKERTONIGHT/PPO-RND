@@ -14,8 +14,6 @@ Plots/
 # Results/
 
 *.pth
-*.avi
-*.gif
 
 # Distribution / packaging
 .Python
