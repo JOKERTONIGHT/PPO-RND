@@ -13,6 +13,35 @@ except ImportError:
     print("Warning: Could not import ale_py")
 
 
+def make_atari(env_id, max_episode_steps, sticky_action=True, max_and_skip=True, render_mode=None):
+    # 创建环境时指定render_mode
+    if render_mode is not None:
+        env = gym.make(env_id, render_mode=render_mode)
+    else:
+        env = gym.make(env_id, render_mode=None)
+    # Gymnasium使用max_episode_steps直接设置
+    env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps * 4)
+    assert 'NoFrameskip' in env.spec.id
+    if sticky_action:
+        env = StickyActionEnv(env)
+    if max_and_skip:
+        env = RepeatActionEnv(env)
+    env = MontezumaVisitedRoomEnv(env, 3)
+    env = AddRandomStateToInfoEnv(env)
+    # 添加最终wrapper使环境返回与原始项目兼容的4值格式
+    env = ReturnFormatWrapper(env)
+
+    return env
+import math
+
+# Import and register Atari environments
+try:
+    import ale_py
+    gym.register_envs(ale_py)
+except ImportError:
+    print("Warning: Could not import ale_py")
+
+
 def mean_of_list(func):
     def function_wrapper(*args, **kwargs):
         lists = func(*args, **kwargs)

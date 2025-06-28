@@ -162,6 +162,9 @@ if __name__ == '__main__':
                                  total_action_probs[0].max(-1).mean())
 
     else:
+        # 测试模式 - 支持指定模型
         checkpoint = logger.load_weights()
-        play = Play(config["env_name"], brain, checkpoint)
+        play = Play(config["env_name"], brain, checkpoint, 
+                   max_episode=1, save_gif=config.get("save_gif", False), 
+                   gif_fps=config.get("gif_fps", 30))
         play.evaluate()

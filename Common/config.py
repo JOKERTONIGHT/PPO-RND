@@ -13,6 +13,10 @@ def get_params():
                         help="The flag determines whether to train the agent or play with it.")
     parser.add_argument("--render", action="store_true",
                         help="The flag determines whether to render each agent or not.")
+    parser.add_argument("--save_gif", action="store_true",
+                        help="Save gameplay as GIF during testing.")
+    parser.add_argument("--gif_fps", default=30, type=int,
+                        help="FPS for saved GIF files.")
     parser.add_argument("--train_from_scratch", action="store_false",
                         help="The flag determines whether to train from scratch or continue previous tries.")
 
